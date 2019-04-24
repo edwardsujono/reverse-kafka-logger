@@ -1,4 +1,6 @@
 import re
+from collections import defaultdict
+from multiprocessing import Process
 
 from kafka import TopicPartition
 
@@ -6,24 +8,38 @@ from logger import kafka_factory
 from logger.constant import BATCH_SIZE
 
 
-def search_messages_in_parallel(topic, brokers):
+def search_messages_in_parallel(topic, brokers, regex):
+	"""
+	Messages will be searched in parallel by spawning process per partition.
+	:param topic:
+	:param brokers:
+	:param regex:
+	:return:
+	"""
 	n_partition = _get_n_partition(brokers, topic)
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers)
-	partition_id_to_start_end_offset = _get_partition_info(kafka_consumer, n_partition)
+	partition_id_to_start_end_offset = _get_partition_info(kafka_consumer, topic, n_partition)
 	for partition in xrange(n_partition):
-		_reverse_search_log_per_partition(kafka_consumer, topic, partition)
+		p = Process(
+			target=_reverse_search_log_per_partition,
+			args=(kafka_consumer, topic, partition, partition_id_to_start_end_offset, regex),
+		)
+		p.start()
+		p.join()
 
 
-def _get_partition_info(kafka_consumer, n_partition):
-	partitions = [partition for partition in n_partition]
+def _get_partition_info(kafka_consumer, topic, n_partition):
+	partition_to_offset_info = defaultdict(dict)
+	partitions = [TopicPartition(topic, partition) for partition in xrange(n_partition)]
 	beginning_offsets = kafka_consumer.beginning_offsets(partitions)
+	for topic_partition, offset in beginning_offsets.items():
+		partition_to_offset_info[topic_partition.partition].update({'start_offset': offset})
+
 	end_offsets = kafka_consumer.end_offsets(partitions)
-	return {
-		i: {
-			'start_offset': beginning_offsets[i],
-			'end_offset': end_offsets[i],
-		} for i in xrange(n_partition),
-	}
+	for topic_partition, offset in end_offsets.items():
+		partition_to_offset_info[topic_partition.partition].update({'end_offset': offset})
+
+	return partition_to_offset_info
 
 
 def _reverse_search_log_per_partition(
@@ -31,6 +47,7 @@ def _reverse_search_log_per_partition(
 	topic,
 	partition,
 	partition_id_to_start_end_offset,
+	regex,
 ):
 	"""
 	This works by using a sliding window mechanism
@@ -43,39 +60,50 @@ def _reverse_search_log_per_partition(
 	:param KafkaConsumer kafka_consumer:
 	:param str topic:
 	:param int partition:
+	:param str regex:
 	:return:
 	"""
 	start_offset = partition_id_to_start_end_offset[partition]['start_offset']
 	end_offset = partition_id_to_start_end_offset[partition]['end_offset']
-	offset = start_offset
 	kafka_consumer.assign([TopicPartition(topic, partition)])
-
 	for offset in range(end_offset, start_offset - 1, -BATCH_SIZE):
-		start_read_offset = offset - BATCH_SIZE
-		end_read_offset = offset
-		if start_read_offset - BATCH_SIZE < start_offset:
-			start_read_offset = start_offset
-
+		start_offset, end_offset = _get_start_end_offset(offset, start_offset)
+		# assign partition and offset to the kafka consumer
 		kafka_consumer.seek(
-			partition=partition,
+			partition=TopicPartition(topic, partition),
 			offset=offset
 		)
+		grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset)
 
-	if offset < start_offset:
+
+def _get_start_end_offset(offset, start_offset):
+	"""
+	start offset might be less than the offset that can be read. Depending with
+	the configuration, messages are saved only in particular time period.
+	:param offset:
+	:param start_offset:
+	:return:
+	"""
+	start_read_offset = offset - BATCH_SIZE
+	end_read_offset = offset
+	if start_read_offset < start_offset:
+		start_read_offset = start_offset
+	return start_read_offset, end_read_offset
 
 
-def grep_messages_in_batch(kafka_consumer, regex, batch_size=BATCH_SIZE):
+def grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
 	"""
 	KafkaConsumer poll --> works by using intern
 	:param KafkaConsumer kafka_consumer:
 	:param str regex:
-	:param int batch_size:
+	:param int start_offset:
+	:param int end_offset:
 	:return:
 	"""
-	counter = 0
-	while counter < BATCH_SIZE:
+	for _ in range(start_offset, end_offset):
 		message = kafka_consumer.poll(0.0001)
-		counter += 1
+		if re.search(regex, message):
+			print message
 
 
 def _get_n_partition(brokers, topic):
@@ -86,4 +114,9 @@ def _get_n_partition(brokers, topic):
 	"""
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	kafka_consumer.subscribe(topics=[topic])
+	"""
+	WARNING!!!  Somehow API partitions_for_topic just can be executed when the kafka_consumer.topics()
+	is executed. TODO: Edward, search the root cause of this, and create pull request for this issues
+	"""
+	kafka_consumer.topics()
 	return len(kafka_consumer.partitions_for_topic(unicode(topic)))
