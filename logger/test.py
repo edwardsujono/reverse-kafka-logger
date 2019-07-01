@@ -1,3 +1,4 @@
+import json
 import re
 from collections import defaultdict
 from multiprocessing import Process
@@ -19,13 +20,26 @@ def search_messages_in_parallel(topic, brokers, regex):
 	n_partition = _get_n_partition(brokers, topic)
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers)
 	partition_id_to_start_end_offset = _get_partition_info(kafka_consumer, topic, n_partition)
+	end_offset = 999
+	start_offset = 0
+	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	for partition in xrange(n_partition):
-		p = Process(
-			target=_reverse_search_log_per_partition,
-			args=(brokers, topic, partition, partition_id_to_start_end_offset, regex),
-		)
-		p.start()
-		p.join()
+		kafka_consumer.assign([TopicPartition(topic, partition)])
+		print 'PARTITION: {}'.format(partition)
+		for offset in range(end_offset, start_offset, -1):
+			start_offset, end_offset = _get_start_end_offset(offset, start_offset)
+			# assign partition and offset to the kafka consumer
+			kafka_consumer.seek(
+				partition=TopicPartition(topic, partition),
+				offset=offset
+			)
+			grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset)
+		# p = Process(
+		# 	target=_reverse_search_log_per_partition,
+		# 	args=(brokers, topic, partition, partition_id_to_start_end_offset, regex),
+		# )
+		# p.start()
+		# p.join()
 
 
 def _get_partition_info(kafka_consumer, topic, n_partition):
@@ -56,8 +70,12 @@ def _reverse_search_log_per_partition(
 							^
 	Normal reading kafka starts from the beginning offset to the end
 	we can seek the offset one by one, but there is an overhead of network
-	to call the kafka broker, so the idea is to batch get the messages
-	:param list[str] brokers:
+	to call the kafka broker, so the idea is to batch get the messages.
+
+	Warning!! KafkaConsumer has the wrapper that somehow will close the socket when the switch context happened.
+	My theory is when we spawned new process, the main-process somehow detect that the variable is no longer
+	useful, so they close the socket connection.
+	:param str brokers:
 	:param str topic:
 	:param int partition:
 	:param str regex:
@@ -66,17 +84,15 @@ def _reverse_search_log_per_partition(
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	start_offset = partition_id_to_start_end_offset[partition]['start_offset']
 	end_offset = partition_id_to_start_end_offset[partition]['end_offset']
-	print 'start_offset: {}, end_offset: {}'.format(start_offset, end_offset)
 	kafka_consumer.assign([TopicPartition(topic, partition)])
 	for offset in range(end_offset, start_offset - 1, -BATCH_SIZE):
-		start_read_offset, end_read_offset = _get_start_end_offset(offset, start_offset)
+		start_offset, end_offset = _get_start_end_offset(offset, start_offset)
 		# assign partition and offset to the kafka consumer
-		print 'start_read_offset: {}, end_read_offset: {}, assigned_offset: {}'.format(start_read_offset, end_read_offset, offset)
 		kafka_consumer.seek(
 			partition=TopicPartition(topic, partition),
-			offset=start_read_offset,
+			offset=offset
 		)
-		grep_messages_in_batch(kafka_consumer, regex, start_read_offset, end_read_offset)
+		grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset)
 
 
 def _get_start_end_offset(offset, start_offset):
@@ -103,9 +119,14 @@ def grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
 	:param int end_offset:
 	:return:
 	"""
-	for _ in range(start_offset, end_offset):
+	for i in range(start_offset, end_offset):
+		# print '========%s=======' % i
 		message = next(kafka_consumer)
-		print 'message: {}'.format(message)
+		if type(message) != str:
+			message = json.dumps(message)
+		if re.search(regex, message):
+			pass
+			# print message
 
 
 def _get_n_partition(brokers, topic):
@@ -122,3 +143,4 @@ def _get_n_partition(brokers, topic):
 	"""
 	kafka_consumer.topics()
 	return len(kafka_consumer.partitions_for_topic(unicode(topic)))
+
