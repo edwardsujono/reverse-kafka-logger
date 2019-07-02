@@ -4,7 +4,7 @@ long_description = ''
 
 setuptools.setup(
 	name='reverse-kafka-logger',
-	version='0.1-dev-2',
+	version='0.1.1',
 	packages=setuptools.find_packages(),
 	long_description=open('README.md').read(),
 	entry_points={
@@ -14,7 +14,7 @@ setuptools.setup(
 		'click',
 	],
 	author="Edward Sujono",
-	description="pip install reverse-kafka-logger; kafka-logger --topic='gg' --brokers='localhost9092;localhost:2928' --regex='wow'",
+	description="grep kafka message reversely from the end offset to start offset",
 	long_description_content_type="text/markdown",
 	url="https://github.com/edwardsujono/kafka-logger",
 	classifiers=[
