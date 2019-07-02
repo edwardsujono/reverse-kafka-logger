@@ -2,3 +2,5 @@
 ENV/
 *.pyc
 .DS_Store
+dist/
+*.egg-info/

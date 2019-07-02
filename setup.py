@@ -3,20 +3,20 @@ import setuptools
 long_description = ''
 
 setuptools.setup(
-	name='kafka-logger',
-	version='0.1dev',
-	packages=['logger'],
-	long_description=open('README.txt').read(),
+	name='reverse-kafka-logger',
+	version='0.1-dev-2',
+	packages=setuptools.find_packages(),
+	long_description=open('README.md').read(),
 	entry_points={
-		'console_scripts': ['grep=logger.grep_interface:run_grep_command'],
+		'console_scripts': ['reverse-kafka-logger=logger.grep_interface:run_grep_command'],
 	},
 	install_requires=[
 		'click',
 	],
-	author="Shopee Checkout Dev",
-	description="Collection of script that help you to execute many things",
+	author="Edward Sujono",
+	description="pip install reverse-kafka-logger; kafka-logger --topic='gg' --brokers='localhost9092;localhost:2928' --regex='wow'",
 	long_description_content_type="text/markdown",
-	url="https://git.garena.com/candinegarae/git_mr",
+	url="https://github.com/edwardsujono/kafka-logger",
 	classifiers=[
 		"Programming Language :: Python :: 2.7",
 		"License :: OSI Approved :: MIT License",
