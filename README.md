@@ -1,3 +1,5 @@
+<a href="https://travis-ci.com/edwardsujono/reverse-kafka-logger.svg?branch=master" alt="Build Status"></a>
+
 # Kafka Logger
 ```text
 pip library that is used to read inversely the kafka message.
