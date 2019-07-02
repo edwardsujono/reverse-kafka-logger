@@ -6,7 +6,10 @@ The best part is each partition of topic will be run in parallel.
 
 # Background
 
+A need to grep the message from kafka reversely because often we want to grep something from the most recent offset.
+
 # Problem
+All the available debugging tools of kafka never introduced such feature.
 
 ## usage
 `pip install rervese-kafka-logger`
