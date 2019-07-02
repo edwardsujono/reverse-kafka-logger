@@ -63,6 +63,9 @@ def _reverse_search_log_per_partition(
 	:param str regex:
 	:return:
 	"""
+	"""
+		Kafka consumer can only be instantiated when the sub-process is spawned otherwise the socket is closed
+	"""
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	start_offset = partition_id_to_start_end_offset[partition]['start_offset']
 	end_offset = partition_id_to_start_end_offset[partition]['end_offset']
@@ -105,7 +108,8 @@ def grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
 	"""
 	for _ in range(start_offset, end_offset):
 		message = next(kafka_consumer)
-		print 'message: {}'.format(message)
+		if re.match(regex, message.value):
+			print 'message: {}'.format(message)
 
 
 def _get_n_partition(brokers, topic):
@@ -116,9 +120,5 @@ def _get_n_partition(brokers, topic):
 	"""
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	kafka_consumer.subscribe(topics=[topic])
-	"""
-	WARNING!!!  Somehow API partitions_for_topic just can be executed when the kafka_consumer.topics()
-	is executed. TODO: Edward, search the root cause of this, and create pull request for this issues
-	"""
 	kafka_consumer.topics()
 	return len(kafka_consumer.partitions_for_topic(unicode(topic)))

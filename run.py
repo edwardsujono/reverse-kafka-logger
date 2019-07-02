@@ -10,5 +10,5 @@ if __name__ == '__main__':
 	grep_manager.search_messages_in_parallel(
 		topic='test_demo',
 		brokers='localhost:9092',
-		regex='',
+		regex='raw_gg',
 	)
