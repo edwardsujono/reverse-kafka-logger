@@ -4,7 +4,7 @@ long_description = ''
 
 setuptools.setup(
 	name='reverse-kafka-logger',
-	version='0.1.1',
+	version='0.1.2',
 	packages=setuptools.find_packages(),
 	long_description=open('README.md').read(),
 	entry_points={

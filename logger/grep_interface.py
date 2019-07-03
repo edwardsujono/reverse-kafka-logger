@@ -1,5 +1,6 @@
 import click
 from logger import grep_manager
+from logger import command_validator
 
 
 @click.command()
@@ -13,11 +14,15 @@ def run_grep_command(topic, brokers, regex):
 	:param str regex:
 	:rtype: None
 	"""
-	grep_manager.search_messages_in_parallel(
-		topic=topic,
-		brokers=brokers,
-		regex=regex,
-	)
+	try:
+		command_validator.validate_grep_input(**locals())
+		grep_manager.search_messages_in_parallel(
+			topic=topic,
+			brokers=brokers,
+			regex=regex,
+		)
+	except ValueError as e:
+		print e
 
 
 if __name__ == '__main__':

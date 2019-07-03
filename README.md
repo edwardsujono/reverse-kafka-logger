@@ -16,6 +16,8 @@ the beginning of the offset. Thus, I created this open source project.
 # usage
 `pip install rervese-kafka-logger`
 
+`reverse-kafka-logger --topic='topic' --brokers='localhost:9092,localhost:9093' --regex='search this' `
+
 # Install
 setup package: `python setup.py dist`
 
