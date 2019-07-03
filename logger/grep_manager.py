@@ -61,25 +61,32 @@ def _reverse_search_log_per_partition(
 	:param str topic:
 	:param int partition:
 	:param str regex:
-	:return:
+	:return:list[str]
 	"""
 	"""
 		Kafka consumer can only be instantiated when the sub-process is spawned otherwise the socket is closed
 	"""
+	matched_messages = []
 	kafka_consumer = kafka_factory.generate_kafka_consumer(brokers, is_singleton=False)
 	start_offset = partition_id_to_start_end_offset[partition]['start_offset']
 	end_offset = partition_id_to_start_end_offset[partition]['end_offset']
-	print 'start_offset: {}, end_offset: {}'.format(start_offset, end_offset)
 	kafka_consumer.assign([TopicPartition(topic, partition)])
 	for offset in range(end_offset, start_offset - 1, -BATCH_SIZE):
 		start_read_offset, end_read_offset = _get_start_end_offset(offset, start_offset)
 		# assign partition and offset to the kafka consumer
-		print 'start_read_offset: {}, end_read_offset: {}, assigned_offset: {}'.format(start_read_offset, end_read_offset, offset)
+		print 'start_read_offset: {}, end_read_offset: {}, assigned_offset: {}'.format(
+			start_read_offset,
+			end_read_offset,
+			offset,
+		)
 		kafka_consumer.seek(
 			partition=TopicPartition(topic, partition),
 			offset=start_read_offset,
 		)
-		grep_messages_in_batch(kafka_consumer, regex, start_read_offset, end_read_offset)
+		matched_messages.extend(
+			_grep_messages_in_batch(kafka_consumer, regex, start_read_offset, end_read_offset)
+		)
+	return matched_messages
 
 
 def _get_start_end_offset(offset, start_offset):
@@ -97,7 +104,7 @@ def _get_start_end_offset(offset, start_offset):
 	return start_read_offset, end_read_offset
 
 
-def grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
+def _grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
 	"""
 	KafkaConsumer poll --> works by using intern
 	:param KafkaConsumer kafka_consumer:
@@ -106,10 +113,13 @@ def grep_messages_in_batch(kafka_consumer, regex, start_offset, end_offset):
 	:param int end_offset:
 	:return:
 	"""
+	messages = []
 	for _ in range(start_offset, end_offset):
 		message = next(kafka_consumer)
 		if re.match(regex, message.value):
+			messages.append(message.value)
 			print 'message: {}'.format(message)
+	return messages
 
 
 def _get_n_partition(brokers, topic):
