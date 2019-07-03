@@ -1,4 +1,4 @@
-# Kafka Logger
+# Reverse Kafka Logger
 <a href="https://travis-ci.com/edwardsujono/reverse-kafka-logger.svg?branch=master"><img src="https://travis-ci.com/edwardsujono/reverse-kafka-logger.svg?branch=master" alt="Build Status"></a>
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
